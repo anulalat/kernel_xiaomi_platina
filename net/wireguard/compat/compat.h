@@ -14,6 +14,9 @@
 #ifdef RHEL_MAJOR
 #if RHEL_MAJOR == 7
 #define ISRHEL7
+#if RHEL_MINOR == 8
+#define ISCENTOS7
+#endif
 #elif RHEL_MAJOR == 8
 #define ISRHEL8
 #ifdef RHEL_MINOR
@@ -96,16 +99,10 @@
 #define ipv6_dst_lookup(a, b, c, d) ipv6_dst_lookup(b, c, d)
 #endif
 
-#if (LINUX_VERSION_CODE == KERNEL_VERSION(4, 4, 0) || \
-    (LINUX_VERSION_CODE < KERNEL_VERSION(4, 3, 5) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)) || \
-    (LINUX_VERSION_CODE < KERNEL_VERSION(4, 1, 17) && LINUX_VERSION_CODE > KERNEL_VERSION(3, 19, 0)) || \
-    (LINUX_VERSION_CODE < KERNEL_VERSION(3, 18, 27) && LINUX_VERSION_CODE >= KERNEL_VERSION(3, 17, 0)) || \
-    (LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 8) && LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)) || \
-    (LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 40) && LINUX_VERSION_CODE >= KERNEL_VERSION(3, 13, 0)) || \
-    (LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 54))) && !defined(ISUBUNTU1404) && !defined(ISRHEL7)
-#include <linux/if.h>
-#include <net/ip_tunnels.h>
-#define IP6_ECN_set_ce(a, b) IP6_ECN_set_ce(b)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0) && LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 83)
+#define ipv6_dst_lookup_flow(a, b, c, d) ipv6_dst_lookup_flow(b, c, d)
+#elif (LINUX_VERSION_CODE < KERNEL_VERSION(5, 4, 5) && LINUX_VERSION_CODE >= KERNEL_VERSION(5, 4, 0)) || (LINUX_VERSION_CODE < KERNEL_VERSION(5, 3, 18) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0) && !defined(ISUBUNTU1904)) || (!defined(ISRHEL8) && !defined(ISDEBIAN) && !defined(ISUBUNTU1804) && LINUX_VERSION_CODE < KERNEL_VERSION(4, 19, 119) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 15, 0)) || (LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 181) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)) || (LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 224) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 5, 0)) || (LINUX_VERSION_CODE < KERNEL_VERSION(4, 4, 224) && !defined(ISUBUNTU1604) && (!defined(ISRHEL7) || defined(ISCENTOS7)))
+#define ipv6_dst_lookup_flow(a, b, c, d) ipv6_dst_lookup(a, b, &dst, c) + (void *)0 ?: dst
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 12, 0) && IS_ENABLED(CONFIG_IPV6) && !defined(ISRHEL7)
@@ -956,7 +953,7 @@ static inline int skb_ensure_writable(struct sk_buff *skb, int write_len)
 #include <net/ipv6.h>
 #include <net/icmp.h>
 #include <net/netfilter/nf_conntrack.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 1, 0) && !defined(ISRHEL8)
 #include <net/netfilter/nf_nat_core.h>
 #endif
 static inline void icmp_ndo_send(struct sk_buff *skb_in, int type, int code, __be32 info)
@@ -1035,6 +1032,47 @@ static inline void skb_reset_redirect(struct sk_buff *skb)
 	skb_reset_tc(skb);
 #endif
 }
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 14, 0) && !defined(ISRHEL7)
+#define skb_get_hash skb_get_rxhash
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 15, 0) && !defined(ISRHEL7)
+#define hash rxhash
+#define l4_hash l4_rxhash
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0) && !defined(ISRHEL7)
+#define sw_hash ignore_df = 0; skb->nf_trace = skb->ooo_okay
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 3, 0)
+#define pre_exit exit
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 8, 0)
+#include <linux/skbuff.h>
+#include <linux/ip.h>
+#include <linux/ipv6.h>
+static inline __be16 ip_tunnel_parse_protocol(const struct sk_buff *skb)
+{
+	if (skb_network_header(skb) >= skb->head &&
+	    (skb_network_header(skb) + sizeof(struct iphdr)) <= skb_tail_pointer(skb) &&
+	    ip_hdr(skb)->version == 4)
+		return htons(ETH_P_IP);
+	if (skb_network_header(skb) >= skb->head &&
+	    (skb_network_header(skb) + sizeof(struct ipv6hdr)) <= skb_tail_pointer(skb) &&
+	    ipv6_hdr(skb)->version == 6)
+		return htons(ETH_P_IPV6);
+	return 0;
+}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 1, 0) || defined(ISRHEL8)
+static const struct header_ops ip_tunnel_header_ops = { .parse_protocol = ip_tunnel_parse_protocol };
+#else
+#define header_ops hard_header_len
+#define ip_tunnel_header_ops *(char *)0 - (char *)0
+#endif
 #endif
 
 #if defined(ISUBUNTU1604) || defined(ISRHEL7)
