@@ -1,4 +1,3 @@
-
 #include <linux/sched.h>
 #include <linux/sched/sysctl.h>
 #include <linux/sched/rt.h>
@@ -1024,15 +1023,6 @@ static inline void set_task_rq(struct task_struct *p, unsigned int cpu)
 	p->rt.parent = tg->rt_se[cpu];
 #endif
 }
-
-#else /* CONFIG_CGROUP_SCHED */
-
-static inline void set_task_rq(struct task_struct *p, unsigned int cpu) { }
-static inline struct task_group *task_group(struct task_struct *p)
-{
-	return NULL;
-}
-#endif /* CONFIG_CGROUP_SCHED */
 
 static inline void __set_task_cpu(struct task_struct *p, unsigned int cpu)
 {
