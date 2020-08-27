@@ -1849,6 +1849,7 @@ static int hfi_process_session_rel_buf_done(u32 device_id,
 		cmd_done.size = sizeof(struct hal_buffer_info);
 	} else {
 		dprintk(VIDC_ERR, "invalid payload in rel_buff_done\n");
+   }
 
 	*info = (struct msm_vidc_cb_info) {
 		.response_type =  HAL_SESSION_RELEASE_BUFFER_DONE,
